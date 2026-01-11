@@ -747,9 +747,11 @@ def test_email_route():
     except Exception as e:
         print(f"Test Email Error: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+# Initialize database tables on module load (works with Gunicorn)
+init_db()
+
 # ============= MAIN =============
 if __name__ == '__main__':
-    init_db()
     print("="*60)
     print("🇮🇳 BHARAT E-GRIEVANCE SYSTEM - MULTILINGUAL EDITION")
     print("🔗 http://127.0.0.1:5000")
