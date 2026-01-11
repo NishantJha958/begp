@@ -90,7 +90,7 @@ EMAIL_CONFIG = {
 
 # ============= AI & SLA CONFIG =============
 # Google Gemini Configuration - Using REST API for Python 3.14 compatibility
-GEMINI_API_KEY = os.getenv('AIzaSyDhC3n9tan0o6mlcjJHKg_vB1_kFjXSysc', '')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
 
 if GEMINI_API_KEY:
