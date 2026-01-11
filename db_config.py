@@ -12,10 +12,11 @@ try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
     POSTGRES_AVAILABLE = True
-except ImportError:
+    print("✅ psycopg2 loaded successfully")
+except Exception as e:
     POSTGRES_AVAILABLE = False
-    print("⚠️  psycopg2 not installed. Using SQLite fallback.")
-    print("   For PostgreSQL support, run: pip install psycopg2-binary")
+    print(f"⚠️  psycopg2 import failed: {type(e).__name__}: {e}")
+    print("   Using SQLite fallback.")
 
 # Database configuration
 DATABASE_URL = os.environ.get('DATABASE_URL')  # From Render or other hosting
