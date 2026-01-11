@@ -701,20 +701,30 @@ def get_file(fn):
 
 @app.route('/api/analytics/dashboard', methods=['GET'])
 def analytics():
-    dept = request.args.get('department')
-    conn = get_db()
-    q = "FROM complaints WHERE 1=1"
-    p = []
-    if dept: q+=" AND department=?"; p.append(dept)
-    
-    tot = conn.execute(sql_query(f"SELECT COUNT(*) {q}"), p).fetchone()[0]
-    avg_r = conn.execute(sql_query(f"SELECT AVG(citizen_feedback_rating) {q}"), p).fetchone()[0] or 0
-    conn.close()
-    return jsonify({"success": True, "analytics": {
-        "total_complaints": tot, 
-        "avg_citizen_rating": round(avg_r, 1), 
-        "avg_resolution_hours": 0
-    }}), 200
+    try:
+        dept = request.args.get('department')
+        conn = get_db()
+        q = "FROM complaints WHERE 1=1"
+        p = []
+        if dept: q+=" AND department=?"; p.append(dept)
+        
+        # Get total count - handle both dict and tuple results
+        result = conn.execute(sql_query(f"SELECT COUNT(*) as cnt {q}"), p).fetchone()
+        tot = result['cnt'] if isinstance(result, dict) else list(result)[0]
+        
+        # Get average rating
+        result = conn.execute(sql_query(f"SELECT AVG(citizen_feedback_rating) as avg_rating {q}"), p).fetchone()
+        avg_r = (result['avg_rating'] if isinstance(result, dict) else list(result)[0]) or 0
+        
+        conn.close()
+        return jsonify({"success": True, "analytics": {
+            "total_complaints": tot, 
+            "avg_citizen_rating": round(float(avg_r), 1), 
+            "avg_resolution_hours": 0
+        }}), 200
+    except Exception as e:
+        print(f"Analytics error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 @app.route('/api/test_email', methods=['POST'])
 def test_email_route():
     try:
