@@ -1,91 +1,320 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Govt Official Dashboard | E-Grievance</title>
-    
+
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <style>
-        * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: #f0f2f5; color: #333; }
-        
-        .login-container { max-width: 400px; margin: 100px auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); text-align: center; }
-        .login-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
-        .login-btn { width: 100%; padding: 12px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        
-        .dashboard-container { display: none; padding: 20px; max-width: 1400px; margin: 0 auto; }
-        .nav-bar { background: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 30px 0; }
-        .stat-card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .stat-num { font-size: 2.5rem; font-weight: bold; color: #667eea; margin: 10px 0; }
-        
-        table { width: 100%; background: white; border-radius: 10px; border-collapse: collapse; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #667eea; color: white; }
-        
-        .action-btn { padding: 8px 15px; border-radius: 5px; cursor: pointer; border: none; font-size: 0.9rem; font-weight: 600; transition: transform 0.2s; }
-        .action-btn:hover { transform: scale(1.05); }
-        .btn-resolve { background: linear-gradient(45deg, #11998e, #38ef7d); color: white; box-shadow: 0 4px 10px rgba(56, 239, 125, 0.3); }
-        .btn-view { background: #e2e8f0; color: #333; margin-right: 5px; }
-        
-        .badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; }
-        .badge-Resolved { background: #d4edda; color: #155724; }
-        .badge-Rejected { background: #f8d7da; color: #721c24; }
-        .badge-Forwarded { background: #cce5ff; color: #004085; }
-        .badge-Pending { background: #fff3cd; color: #856404; }
-        .badge-Escalated { background: #ffcccc; color: #cc0000; animation: pulse 1s infinite; }
-        
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
-        .modal { 
-            display: none; 
-            position: fixed; 
-            z-index: 1000; 
-            left: 0; 
-            top: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(0,0,0,0.6); 
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            margin: 0;
+            background: #f0f2f5;
+            color: #333;
+        }
+
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .dashboard-container {
+            display: none;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .nav-bar {
+            background: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-num {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+
+        table {
+            width: 100%;
+            background: white;
+            border-radius: 10px;
+            border-collapse: collapse;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        th,
+        td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+        }
+
+        .action-btn {
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .action-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-resolve {
+            background: linear-gradient(45deg, #11998e, #38ef7d);
+            color: white;
+            box-shadow: 0 4px 10px rgba(56, 239, 125, 0.3);
+        }
+
+        .btn-view {
+            background: #e2e8f0;
+            color: #333;
+            margin-right: 5px;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .badge-Resolved {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-Rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-Forwarded {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .badge-Pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-Escalated {
+            background: #ffcccc;
+            color: #cc0000;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(5px);
             overflow-y: auto;
         }
-        
-        .modal-content { 
-            background: white; 
+
+        .modal-content {
+            background: white;
             margin: 50px auto;
-            padding: 30px; 
-            border-radius: 15px; 
-            max-width: 700px; 
-            width: 90%; 
-            box-shadow: 0 25px 50px rgba(0,0,0,0.3); 
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 700px;
+            width: 90%;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
             animation: slideIn 0.3s;
             position: relative;
         }
 
-        @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 20px; }
-        .modal-header h3 { margin: 0; color: #667eea; }
-        .close { font-size: 28px; cursor: pointer; color: #aaa; }
-        .close:hover { color: #333; }
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
 
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
-        .form-group select, .form-group textarea, .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; }
-        
-        .file-preview { display: flex; align-items: center; gap: 10px; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px dashed #ccc; margin-bottom: 20px; }
-        .file-preview a { color: #667eea; text-decoration: none; font-weight: bold; }
-        
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 15px; border-top: 2px solid #f0f0f0; margin-top: 20px; }
-        .btn-cancel { background: #eee; color: #333; }
-        .btn-submit { background: #667eea; color: white; }
-        .btn-submit:hover { background: #5a6fd6; }
-        
-        .route-highlight { background: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3; }
-        .route-highlight label { color: #0d47a1; font-weight: bold; }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #667eea;
+        }
+
+        .close {
+            font-size: 28px;
+            cursor: pointer;
+            color: #aaa;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group select,
+        .form-group textarea,
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: inherit;
+        }
+
+        .file-preview {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px dashed #ccc;
+            margin-bottom: 20px;
+        }
+
+        .file-preview a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding-top: 15px;
+            border-top: 2px solid #f0f0f0;
+            margin-top: 20px;
+        }
+
+        .btn-cancel {
+            background: #eee;
+            color: #333;
+        }
+
+        .btn-submit {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-submit:hover {
+            background: #5a6fd6;
+        }
+
+        .route-highlight {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .route-highlight label {
+            color: #0d47a1;
+            font-weight: bold;
+        }
 
         /* Map specific styles */
         .location-section {
@@ -95,6 +324,7 @@
             margin: 20px 0;
             border-left: 4px solid #667eea;
         }
+
         .location-section h4 {
             margin: 0 0 15px 0;
             color: #667eea;
@@ -102,6 +332,7 @@
             align-items: center;
             gap: 10px;
         }
+
         #complaint-map-container {
             margin: 15px 0;
             border: 2px solid #667eea;
@@ -109,20 +340,24 @@
             overflow: hidden;
             box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
         }
+
         #complaint-map {
             height: 300px;
             width: 100%;
         }
+
         .location-info {
             background: white;
             padding: 12px;
             border-radius: 8px;
             margin-top: 10px;
         }
+
         .location-info p {
             margin: 5px 0;
             font-size: 0.9rem;
         }
+
         .map-link-btn {
             display: inline-block;
             padding: 8px 16px;
@@ -133,9 +368,11 @@
             margin-top: 10px;
             font-weight: 600;
         }
+
         .map-link-btn:hover {
             background: #00a043;
         }
+
         .no-location {
             color: #999;
             font-style: italic;
@@ -146,6 +383,7 @@
         }
     </style>
 </head>
+
 <body>
 
     <div id="login-screen" class="login-container">
@@ -154,7 +392,8 @@
         <input type="password" id="l-pass" class="login-input" placeholder="Password">
         <input type="text" id="l-govtid" class="login-input" placeholder="Govt ID">
         <button onclick="login()" class="login-btn">Secure Login</button>
-        <p onclick="window.location.href='index.html'" style="cursor: pointer; margin-top: 20px; color: #667eea;">← Back to Citizen Portal</p>
+        <p onclick="window.location.href='index.html'" style="cursor: pointer; margin-top: 20px; color: #667eea;">← Back
+            to Citizen Portal</p>
     </div>
 
     <div id="dashboard" class="dashboard-container">
@@ -195,7 +434,9 @@
                 </tr>
             </thead>
             <tbody id="table-body">
-                <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                <tr>
+                    <td colspan="6" style="text-align: center;">Loading...</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -265,14 +506,14 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        const API = 'http://127.0.0.1:5000';
+        const API = '';  // Use relative URLs (works on localhost AND Render)
         let token = localStorage.getItem('officer_token');
         let currentComplaintId = null;
         let complaintsData = [];
         let complaintMap = null;
         let complaintMarker = null;
 
-        if(token) showDashboard();
+        if (token) showDashboard();
 
         async function login() {
             const user = document.getElementById('l-user').value;
@@ -282,19 +523,19 @@
             try {
                 const res = await fetch(API + '/api/official/login', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: user, password: pass, govt_id: gid })
                 });
                 const data = await res.json();
-                
-                if(data.success) {
+
+                if (data.success) {
                     localStorage.setItem('officer_token', data.token);
                     localStorage.setItem('officer_dept', data.department);
                     showDashboard();
                 } else {
                     alert('Login Failed: ' + data.message);
                 }
-            } catch(e) { alert('Server Error'); }
+            } catch (e) { alert('Server Error'); }
         }
 
         function showDashboard() {
@@ -306,11 +547,11 @@
 
         async function loadData() {
             const dept = localStorage.getItem('officer_dept');
-            
+
             // Load Analytics
             const aRes = await fetch(API + `/api/analytics/dashboard?department=${dept}`);
             const aData = await aRes.json();
-            if(aData.success) {
+            if (aData.success) {
                 document.getElementById('stat-total').textContent = aData.analytics.total_complaints;
                 document.getElementById('stat-rating').textContent = aData.analytics.avg_citizen_rating;
                 document.getElementById('stat-time').textContent = aData.analytics.avg_resolution_hours + 'h';
@@ -319,19 +560,19 @@
             // Load Complaints
             const cRes = await fetch(API + `/api/complaints?department=${dept}`);
             const cData = await cRes.json();
-            
-            if(cData.success) {
+
+            if (cData.success) {
                 complaintsData = cData.complaints;
                 const tbody = document.getElementById('table-body');
                 tbody.innerHTML = '';
-                
+
                 let slaCount = 0;
                 cData.complaints.forEach(c => {
-                    if(c.escalation_level !== 'NONE') slaCount++;
-                    
+                    if (c.escalation_level !== 'NONE') slaCount++;
+
                     const badgeClass = `badge-${c.status}`;
                     const escClass = c.escalation_level === 'CRITICAL' ? 'badge-Escalated' : '';
-                    
+
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${c.id}</td>
@@ -400,17 +641,17 @@
         function openActionModal(id) {
             currentComplaintId = id;
             const complaint = complaintsData.find(c => c.id === id);
-            
+
             if (!complaint) return;
 
             document.getElementById('modal-cid').textContent = id;
-            
+
             // Handle location display
             const locationDisplay = document.getElementById('location-display');
             if (complaint.latitude && complaint.longitude) {
                 const lat = parseFloat(complaint.latitude);
                 const lon = parseFloat(complaint.longitude);
-                
+
                 if (!isNaN(lat) && !isNaN(lon)) {
                     // Show map with location
                     initComplaintMap(lat, lon);
@@ -452,7 +693,7 @@
 
         function closeModal() {
             document.getElementById('action-modal').style.display = 'none';
-            
+
             // Clean up map
             if (complaintMap) {
                 complaintMap.remove();
@@ -494,7 +735,7 @@
                     body: fd
                 });
                 const data = await res.json();
-                
+
                 if (data.success) {
                     alert(`✅ Complaint marked as ${action}!`);
                     closeModal();
@@ -516,7 +757,7 @@
             location.reload();
         }
 
-        window.onclick = function(event) {
+        window.onclick = function (event) {
             const modal = document.getElementById('action-modal');
             if (event.target == modal) {
                 closeModal();
@@ -524,4 +765,5 @@
         }
     </script>
 </body>
+
 </html>
