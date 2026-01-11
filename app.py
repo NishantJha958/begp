@@ -6,7 +6,7 @@
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from db_config import get_db, init_db, is_postgres  # PostgreSQL support
+from db_config import get_db, init_db, is_postgres, sql_query  # PostgreSQL support
 import os
 import time
 import random
@@ -316,7 +316,7 @@ def route_complaint(cat):
 
 def get_department_email(dept):
     conn = get_db()
-    result = conn.execute('SELECT email FROM officials WHERE department=? LIMIT 1', (dept,)).fetchone()
+    result = conn.execute(sql_query('SELECT email FROM officials WHERE department=? LIMIT 1'), (dept,)).fetchone()
     conn.close()
     return result['email'] if result else None
 
@@ -526,13 +526,13 @@ def submit():
                 f.save(os.path.join(app.config['UPLOAD_FOLDER'], media))
         
         conn = get_db()
-        conn.execute('''INSERT INTO complaints 
+        conn.execute(sql_query('''INSERT INTO complaints 
             (id, citizen_name, citizen_email, citizen_phone, citizen_address, 
              latitude, longitude, location_address,
              category, description, description_original, description_translated,
              media_path, priority, department, assigned_to, 
              created_at, sla_hours, sla_deadline, ai_analysis, citizen_language)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''),
             (tid, d['citizen_name'], d['citizen_email'], d['citizen_phone'], d['citizen_address'],
              lat, lon, loc_addr,
              cat if cat else 'Auto-Detected', desc_translated, desc_original, desc_translated, 
@@ -584,7 +584,7 @@ def login():
     try:
         d = request.json
         conn = get_db()
-        off = conn.execute('SELECT * FROM officials WHERE username=? AND password_hash=? AND govt_id=?',
+        off = conn.execute(sql_query('SELECT * FROM officials WHERE username=? AND password_hash=? AND govt_id=?'),
                           (d['username'], hash_password(d['password']), d['govt_id'])).fetchone()
         conn.close()
         if off:
@@ -608,7 +608,7 @@ def get_complaints():
     if dept: 
         q += " AND department=?"; p.append(dept)
     q += " ORDER BY priority DESC, created_at DESC"
-    rows = conn.execute(q, p).fetchall()
+    rows = conn.execute(sql_query(q), p).fetchall()
     conn.close()
     
     res = []
@@ -630,7 +630,7 @@ def update(cid):
         forward_dept = d.get('forward_dept')
         
         conn = get_db()
-        curr = conn.execute('SELECT * FROM complaints WHERE id=?', (cid,)).fetchone()
+        curr = conn.execute(sql_query('SELECT * FROM complaints WHERE id=?'), (cid,)).fetchone()
         
         upd_q = "UPDATE complaints SET status=?, resolution_summary=?"
         upd_p = [status, summary]
@@ -657,7 +657,7 @@ def update(cid):
         upd_q += " WHERE id=?"
         upd_p.append(cid)
         
-        conn.execute(upd_q, upd_p)
+        conn.execute(sql_query(upd_q), upd_p)
         conn.commit()
         conn.close()
         return jsonify({"success": True}), 200
@@ -670,7 +670,7 @@ def feedback(cid):
     try:
         d = request.json
         conn = get_db()
-        conn.execute('UPDATE complaints SET citizen_feedback_rating=?, citizen_feedback_comments=? WHERE id=?',
+        conn.execute(sql_query('UPDATE complaints SET citizen_feedback_rating=?, citizen_feedback_comments=? WHERE id=?'),
                     (d['rating'], d.get('comment',''), cid))
         conn.commit()
         conn.close()
@@ -683,9 +683,9 @@ def add_official():
     try:
         d = request.json
         conn = get_db()
-        conn.execute('''INSERT INTO officials 
+        conn.execute(sql_query('''INSERT INTO officials 
                        (username, password_hash, govt_id, name, department, email, phone) 
-                       VALUES (?,?,?,?,?,?,?)''',
+                       VALUES (?,?,?,?,?,?,?)'''),
                     (d['username'], hash_password(d['password']), d['govt_id'], 
                      d['name'], d['department'], d.get('email'), d.get('phone')))
         conn.commit()
@@ -707,8 +707,8 @@ def analytics():
     p = []
     if dept: q+=" AND department=?"; p.append(dept)
     
-    tot = conn.execute(f"SELECT COUNT(*) {q}", p).fetchone()[0]
-    avg_r = conn.execute(f"SELECT AVG(citizen_feedback_rating) {q}", p).fetchone()[0] or 0
+    tot = conn.execute(sql_query(f"SELECT COUNT(*) {q}"), p).fetchone()[0]
+    avg_r = conn.execute(sql_query(f"SELECT AVG(citizen_feedback_rating) {q}"), p).fetchone()[0] or 0
     conn.close()
     return jsonify({"success": True, "analytics": {
         "total_complaints": tot, 

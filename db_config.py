@@ -51,6 +51,15 @@ def is_postgres():
     """Check if currently using PostgreSQL"""
     return DATABASE_URL and POSTGRES_AVAILABLE
 
+def sql_query(query):
+    """
+    Convert SQL query placeholders for the current database.
+    SQLite uses ? placeholders, psycopg3 uses %s placeholders.
+    """
+    if is_postgres():
+        return query.replace('?', '%s')
+    return query
+
 def init_db():
     """Initialize database tables"""
     conn = get_db()
