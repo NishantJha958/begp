@@ -7,15 +7,15 @@ import os
 import sqlite3
 from urllib.parse import urlparse
 
-# Try to import PostgreSQL driver
+# Try to import PostgreSQL driver (psycopg3)
 try:
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
+    import psycopg
+    from psycopg.rows import dict_row
     POSTGRES_AVAILABLE = True
-    print("✅ psycopg2 loaded successfully")
+    print("✅ psycopg3 loaded successfully")
 except Exception as e:
     POSTGRES_AVAILABLE = False
-    print(f"⚠️  psycopg2 import failed: {type(e).__name__}: {e}")
+    print(f"⚠️  psycopg import failed: {type(e).__name__}: {e}")
     print("   Using SQLite fallback.")
 
 # Database configuration
@@ -32,11 +32,10 @@ def get_db():
             # Parse DATABASE_URL if it starts with postgres://
             db_url = DATABASE_URL
             if db_url.startswith('postgres://'):
-                # Render uses postgres:// but psycopg2 needs postgresql://
+                # Render uses postgres:// but psycopg needs postgresql://
                 db_url = db_url.replace('postgres://', 'postgresql://', 1)
             
-            conn = psycopg2.connect(db_url)
-            conn.row_factory = RealDictCursor  # Return rows as dictionaries
+            conn = psycopg.connect(db_url, row_factory=dict_row)
             return conn
         except Exception as e:
             print(f"❌ PostgreSQL connection failed: {e}")
