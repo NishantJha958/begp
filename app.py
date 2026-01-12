@@ -450,6 +450,219 @@ def verify():
         return jsonify({"success": True}), 200
     return jsonify({"success": False, "message": "All fields required"}), 400
 
+# ============= CITIZEN SESSION MANAGEMENT =============
+
+@app.route('/api/citizen/check', methods=['POST'])
+def check_citizen():
+    """Check if a citizen is already registered by phone or email"""
+    try:
+        d = request.json
+        phone = d.get('phone', '').strip()
+        email = d.get('email', '').strip()
+        
+        if not phone and not email:
+            return jsonify({"success": False, "message": "Phone or email required"}), 400
+        
+        conn = get_db()
+        citizen = None
+        
+        if phone:
+            citizen = conn.execute(sql_query('SELECT * FROM citizens WHERE phone=?'), (phone,)).fetchone()
+        
+        if not citizen and email:
+            citizen = conn.execute(sql_query('SELECT * FROM citizens WHERE email=?'), (email,)).fetchone()
+        
+        conn.close()
+        
+        if citizen:
+            return jsonify({
+                "success": True,
+                "exists": True,
+                "citizen": {
+                    "name": citizen['name'],
+                    "email": citizen['email'],
+                    "phone": citizen['phone'],
+                    "verified_at": citizen['verified_at'],
+                    "last_login": citizen['last_login']
+                }
+            }), 200
+        else:
+            return jsonify({"success": True, "exists": False}), 200
+            
+    except Exception as e:
+        print(f"Check citizen error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/citizen/register', methods=['POST'])
+def register_citizen():
+    """Register a new citizen after OTP verification"""
+    try:
+        d = request.json
+        name = d.get('name', '').strip()
+        email = d.get('email', '').strip()
+        phone = d.get('phone', '').strip()
+        public_id = d.get('public_id', '').strip()
+        language = d.get('language', 'en')
+        
+        if not name or not email or not phone:
+            return jsonify({"success": False, "message": "Name, email and phone required"}), 400
+        
+        conn = get_db()
+        
+        # Check if already exists
+        existing = conn.execute(sql_query('SELECT * FROM citizens WHERE phone=? OR email=?'), 
+                               (phone, email)).fetchone()
+        
+        if existing:
+            # Update last login instead
+            session_token = f"CTZ_{int(time.time())}_{random.randint(1000,9999)}"
+            conn.execute(sql_query('''UPDATE citizens SET last_login=?, session_token=?, preferred_language=? 
+                                     WHERE phone=? OR email=?'''),
+                        (datetime.now().isoformat(), session_token, language, phone, email))
+            conn.commit()
+            conn.close()
+            return jsonify({
+                "success": True,
+                "message": "Welcome back!",
+                "is_returning": True,
+                "session_token": session_token,
+                "citizen": {
+                    "name": existing['name'],
+                    "email": existing['email'],
+                    "phone": existing['phone']
+                }
+            }), 200
+        
+        # Register new citizen
+        session_token = f"CTZ_{int(time.time())}_{random.randint(1000,9999)}"
+        now = datetime.now().isoformat()
+        
+        conn.execute(sql_query('''INSERT INTO citizens 
+                       (name, email, phone, public_id, verified_at, last_login, session_token, preferred_language, created_at)
+                       VALUES (?,?,?,?,?,?,?,?,?)'''),
+                    (name, email, phone, public_id, now, now, session_token, language, now))
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ New citizen registered: {name} ({phone})")
+        
+        return jsonify({
+            "success": True,
+            "message": "Registration successful!",
+            "is_returning": False,
+            "session_token": session_token,
+            "citizen": {
+                "name": name,
+                "email": email,
+                "phone": phone
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Register citizen error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/citizen/login', methods=['POST'])
+def login_citizen():
+    """Quick login for returning citizens - just phone + OTP verification"""
+    try:
+        d = request.json
+        phone = d.get('phone', '').strip()
+        
+        if not phone:
+            return jsonify({"success": False, "message": "Phone number required"}), 400
+        
+        conn = get_db()
+        citizen = conn.execute(sql_query('SELECT * FROM citizens WHERE phone=?'), (phone,)).fetchone()
+        
+        if not citizen:
+            conn.close()
+            return jsonify({
+                "success": False, 
+                "exists": False,
+                "message": "Phone not registered. Please complete full registration."
+            }), 404
+        
+        # Update last login and generate new session token
+        session_token = f"CTZ_{int(time.time())}_{random.randint(1000,9999)}"
+        conn.execute(sql_query('UPDATE citizens SET last_login=?, session_token=? WHERE phone=?'),
+                    (datetime.now().isoformat(), session_token, phone))
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Citizen logged in: {citizen['name']} ({phone})")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Welcome back, {citizen['name']}!",
+            "session_token": session_token,
+            "citizen": {
+                "name": citizen['name'],
+                "email": citizen['email'],
+                "phone": citizen['phone'],
+                "public_id": citizen['public_id'],
+                "preferred_language": citizen['preferred_language']
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Login citizen error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/citizen/session', methods=['POST'])
+def validate_session():
+    """Validate a session token and return citizen data"""
+    try:
+        d = request.json
+        token = d.get('session_token', '').strip()
+        
+        if not token:
+            return jsonify({"success": False, "valid": False}), 400
+        
+        conn = get_db()
+        citizen = conn.execute(sql_query('SELECT * FROM citizens WHERE session_token=?'), (token,)).fetchone()
+        conn.close()
+        
+        if citizen:
+            return jsonify({
+                "success": True,
+                "valid": True,
+                "citizen": {
+                    "name": citizen['name'],
+                    "email": citizen['email'],
+                    "phone": citizen['phone'],
+                    "public_id": citizen['public_id'],
+                    "preferred_language": citizen['preferred_language']
+                }
+            }), 200
+        else:
+            return jsonify({"success": True, "valid": False}), 200
+            
+    except Exception as e:
+        print(f"Session validation error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/citizen/logout', methods=['POST'])
+def logout_citizen():
+    """Clear citizen session"""
+    try:
+        d = request.json
+        token = d.get('session_token', '').strip()
+        phone = d.get('phone', '').strip()
+        
+        conn = get_db()
+        if token:
+            conn.execute(sql_query('UPDATE citizens SET session_token=NULL WHERE session_token=?'), (token,))
+        elif phone:
+            conn.execute(sql_query('UPDATE citizens SET session_token=NULL WHERE phone=?'), (phone,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"success": True, "message": "Logged out successfully"}), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @app.route('/api/check_duplicates', methods=['POST'])
 def check_duplicates():
     """

@@ -802,10 +802,20 @@
     <div class="container">
         <div id="role-selection">
             <div class="role-card" onclick="showStep('citizen-verification')">
-                <h3>👤 Citizen Portal</h3>
-                <p>File complaints with AI-powered priority assignment, real-time SLA tracking, intelligent department
-                    routing, and multilingual support.</p>
-                <button class="role-button">CITIZEN LOGIN →</button>
+                <h3>👤 New Citizen</h3>
+                <p>First time here? File complaints with AI-powered priority assignment, real-time SLA tracking, and
+                    multilingual support.</p>
+                <button class="role-button">NEW REGISTRATION →</button>
+            </div>
+
+            <div class="role-card" onclick="showReturningUserLogin()"
+                style="background: linear-gradient(white, white) padding-box, linear-gradient(135deg, #28a745, #20c997) border-box;">
+                <h3
+                    style="background: linear-gradient(135deg, #28a745, #20c997); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
+                    🔄 Returning Citizen</h3>
+                <p>Already registered? Quick login with your phone number to track your existing complaints.</p>
+                <button class="role-button" style="background: linear-gradient(135deg, #28a745, #20c997);">QUICK LOGIN
+                    →</button>
             </div>
 
             <div class="role-card" onclick="window.location.href='official.html'">
@@ -813,6 +823,40 @@
                 <p>Access AI-analyzed complaints with map visualization, auto-translation, escalation alerts, and
                     performance analytics.</p>
                 <button class="role-button">OFFICIAL LOGIN→</button>
+            </div>
+        </div>
+
+        <!-- Returning User Quick Login Form -->
+        <div id="returning-user-login" class="step-form">
+            <h3>🔄 Welcome Back! Quick Login</h3>
+
+            <div
+                style="background: linear-gradient(135deg, #28a74520, #20c99720); padding: 20px; border-radius: 15px; margin-bottom: 25px; border-left: 5px solid #28a745;">
+                <p style="margin: 0; font-size: 1rem;">✨ Since you've registered before, just verify your phone number
+                    to access your dashboard!</p>
+            </div>
+
+            <label for="returning-phone" class="mandatory">Registered Phone Number:</label>
+            <div class="input-group">
+                <input type="tel" id="returning-phone" placeholder="Enter your registered 10 digit mobile"
+                    pattern="[0-9]{10}" maxlength="10" required>
+                <button type="button" onclick="checkReturningUser()">Check & Send OTP</button>
+            </div>
+            <p id="returning-status" style="margin-top: 5px; margin-bottom: 20px; font-weight: 600;"></p>
+
+            <div id="returning-otp-section" style="display: none;">
+                <label for="returning-otp" class="mandatory">Enter OTP:</label>
+                <div class="input-group">
+                    <input type="text" id="returning-otp" placeholder="Enter 6-digit OTP" maxlength="6"
+                        pattern="[0-9]{6}" inputmode="numeric">
+                    <button type="button" onclick="verifyReturningOtp()">Verify & Login</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+                <p style="color: #666; margin-bottom: 10px;">Not registered yet?</p>
+                <button type="button" onclick="showStep('citizen-verification')"
+                    style="background: linear-gradient(45deg, #6c757d, #495057);">← Go to New Registration</button>
             </div>
         </div>
 
@@ -1079,6 +1123,11 @@
         // Store the generated OTPs for verification
         let phoneOtp = null;
         let emailOtp = null;
+
+        // Session management
+        let sessionToken = localStorage.getItem('citizen_session_token') || null;
+        let returningUserOtp = null;
+        let returningUserData = null;
 
         function changeLanguage() {
             selectedLanguage = document.getElementById('language-select').value;
@@ -2095,7 +2144,323 @@
             stopVoiceInput();
             await originalSubmitComplaint();
         };
-    </script>
+
+        // ============= SESSION MANAGEMENT & RETURNING USER LOGIN =============
+
+        // Check for existing session on page load
+        async function checkExistingSession() {
+            if (!sessionToken) {
+                console.log('📋 No existing session found');
+                return false;
+            }
+
+            try {
+                const res = await fetch(API + '/api/citizen/session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_token: sessionToken })
+                });
+                const data = await res.json();
+
+                if (data.success && data.valid) {
+                    // Session is valid! Auto-login the user
+                    const citizen = data.citizen;
+                    userName = citizen.name;
+                    userEmail = citizen.email;
+                    userPhone = citizen.phone;
+                    idVerified = true;
+                    phoneOtpVerified = true;
+                    emailOtpVerified = true;
+
+                    // Set preferred language
+                    if (citizen.preferred_language) {
+                        selectedLanguage = citizen.preferred_language;
+                        document.getElementById('language-select').value = selectedLanguage;
+                        changeLanguage();
+                    }
+
+                    console.log(`✅ Session restored for: ${userName}`);
+
+                    // Show dashboard directly
+                    document.getElementById('dashboard-greeting').textContent = `Welcome back, ${userName}! 👋`;
+                    showStep('citizen-dashboard');
+                    loadComplaints();
+                    return true;
+                } else {
+                    // Invalid session, clear it
+                    localStorage.removeItem('citizen_session_token');
+                    sessionToken = null;
+                    console.log('⚠️ Session expired or invalid');
+                    return false;
+                }
+            } catch (e) {
+                console.error('Session check error:', e);
+                return false;
+            }
+        }
+
+        // Show returning user login form
+        function showReturningUserLogin() {
+            document.querySelectorAll('.step-form').forEach(f => f.classList.remove('active'));
+            document.getElementById('returning-user-login').classList.add('active');
+            document.getElementById('role-selection').style.display = 'none';
+            document.getElementById('progress-bar').style.display = 'none';
+
+            // Clear any previous state
+            document.getElementById('returning-phone').value = '';
+            document.getElementById('returning-status').textContent = '';
+            document.getElementById('returning-otp-section').style.display = 'none';
+        }
+
+        // Check if returning user exists and send OTP
+        async function checkReturningUser() {
+            const phone = document.getElementById('returning-phone').value.trim();
+            const statusEl = document.getElementById('returning-status');
+
+            if (!phone || phone.length !== 10) {
+                statusEl.textContent = '⚠️ Please enter a valid 10-digit phone number';
+                statusEl.style.color = '#e74c3c';
+                return;
+            }
+
+            statusEl.textContent = '🔍 Checking...';
+            statusEl.style.color = '#667eea';
+
+            try {
+                const res = await fetch(API + '/api/citizen/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone })
+                });
+                const data = await res.json();
+
+                if (data.success && data.exists) {
+                    // User found! Store data and show OTP section
+                    returningUserData = data.citizen;
+                    statusEl.innerHTML = `✅ Found! Welcome back, <strong>${data.citizen.name}</strong>! OTP sent to your phone.`;
+                    statusEl.style.color = '#28a745';
+
+                    // Generate OTP
+                    returningUserOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                    alert(`📱 Mock OTP: ${returningUserOtp}\n\n(In production: sent via SMS)\n\nEnter this OTP to login.`);
+
+                    // Show OTP section
+                    document.getElementById('returning-otp-section').style.display = 'block';
+                } else {
+                    statusEl.innerHTML = '❌ Phone not registered. Please <a href="#" onclick="showStep(\'citizen-verification\'); return false;" style="color: #667eea;">register as new citizen</a>.';
+                    statusEl.style.color = '#e74c3c';
+                }
+            } catch (e) {
+                statusEl.textContent = '❌ Error checking. Please try again.';
+                statusEl.style.color = '#e74c3c';
+                console.error('Check returning user error:', e);
+            }
+        }
+
+        // Verify returning user OTP and login
+        async function verifyReturningOtp() {
+            const enteredOtp = document.getElementById('returning-otp').value.trim();
+            const phone = document.getElementById('returning-phone').value.trim();
+
+            if (!enteredOtp || enteredOtp.length !== 6) {
+                alert('⚠️ Please enter a 6-digit OTP');
+                return;
+            }
+
+            if (enteredOtp !== returningUserOtp) {
+                alert('❌ Invalid OTP. Please try again.');
+                return;
+            }
+
+            // OTP verified! Login the user
+            try {
+                const res = await fetch(API + '/api/citizen/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    // Save session
+                    sessionToken = data.session_token;
+                    localStorage.setItem('citizen_session_token', sessionToken);
+
+                    // Set user data
+                    const citizen = data.citizen;
+                    userName = citizen.name;
+                    userEmail = citizen.email;
+                    userPhone = citizen.phone;
+                    idVerified = true;
+                    phoneOtpVerified = true;
+                    emailOtpVerified = true;
+
+                    // Set preferred language
+                    if (citizen.preferred_language) {
+                        selectedLanguage = citizen.preferred_language;
+                        document.getElementById('language-select').value = selectedLanguage;
+                        changeLanguage();
+                    }
+
+                    alert(`✅ ${data.message}`);
+
+                    // Go to dashboard
+                    document.getElementById('dashboard-greeting').textContent = `Welcome back, ${userName}! 👋`;
+                    document.getElementById('progress-bar').style.display = 'flex';
+                    showStep('citizen-dashboard');
+                    loadComplaints();
+                } else {
+                    alert('❌ Login failed: ' + data.message);
+                }
+            } catch (e) {
+                alert('❌ Login error. Please try again.');
+                console.error('Login error:', e);
+            }
+        }
+
+        // Register citizen after first verification (update existing checkHistoryAndContinue)
+        const originalCheckHistoryAndContinue = checkHistoryAndContinue;
+        checkHistoryAndContinue = async function () {
+            if (!idVerified || !phoneOtpVerified || !emailOtpVerified) {
+                alert('⚠️ Please complete all verification steps');
+                return;
+            }
+
+            userName = document.getElementById('name').value;
+            userPhone = document.getElementById('phone').value;
+            userEmail = document.getElementById('email').value;
+            const publicId = document.getElementById('public-id').value;
+
+            const btn = document.getElementById('verify-continue-btn');
+            btn.disabled = true;
+            btn.innerHTML = 'Registering... <span class="spinner"></span>';
+
+            try {
+                // Register/login citizen in database
+                const res = await fetch(API + '/api/citizen/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: userName,
+                        email: userEmail,
+                        phone: userPhone,
+                        public_id: publicId,
+                        language: selectedLanguage
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    // Save session token
+                    sessionToken = data.session_token;
+                    localStorage.setItem('citizen_session_token', sessionToken);
+
+                    if (data.is_returning) {
+                        alert(`✅ ${data.message} Your account was found.`);
+                    } else {
+                        console.log('✅ New citizen registered');
+                    }
+
+                    // Proceed to complaint form
+                    showStep('complaint-submission');
+                    document.getElementById('dashboard-greeting').textContent = `Welcome, ${userName}`;
+                } else {
+                    alert('❌ Registration failed: ' + data.message);
+                }
+            } catch (e) {
+                console.error('Registration error:', e);
+                // Fallback to original behavior
+                try {
+                    const res = await fetch(API + '/api/verify_citizen', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: userName, email: userEmail, phone: userPhone })
+                    });
+
+                    if (res.ok) {
+                        showStep('complaint-submission');
+                        document.getElementById('dashboard-greeting').textContent = `Welcome, ${userName}`;
+                    } else {
+                        alert('❌ Verification failed');
+                    }
+                } catch (e2) {
+                    alert('❌ Server error');
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Continue →';
+            }
+        };
+
+        // Update returnToLoginPage to clear session
+        const originalReturnToLoginPage = returnToLoginPage;
+        returnToLoginPage = function () {
+            const confirmed = confirm('🔄 Return to Login Page?\n\nThis will log you out. You can login again anytime with your phone number.\n\nClick OK to continue.');
+
+            if (confirmed) {
+                // Clear session from server
+                if (sessionToken) {
+                    fetch(API + '/api/citizen/logout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_token: sessionToken })
+                    }).catch(e => console.log('Logout request failed:', e));
+                }
+
+                // Clear local storage
+                localStorage.removeItem('citizen_session_token');
+                sessionToken = null;
+
+                // Clear all user data
+                userName = '';
+                userPhone = '';
+                userEmail = '';
+                idVerified = false;
+                phoneOtpVerified = false;
+                emailOtpVerified = false;
+                phoneOtp = null;
+                emailOtp = null;
+                returningUserOtp = null;
+                returningUserData = null;
+
+                // Reset map data
+                selectedLat = null;
+                selectedLon = null;
+                if (marker && map) {
+                    map.removeLayer(marker);
+                    marker = null;
+                }
+
+                // Clear forms
+                const verificationForm = document.getElementById('citizen-verification');
+                const complaintForm = document.getElementById('complaint-submission');
+                if (verificationForm) verificationForm.reset();
+                if (complaintForm) complaintForm.reset();
+
+                // Reset verification status
+                document.getElementById('id-status').textContent = '⏳ Awaiting Verification';
+                document.getElementById('id-status').style.color = '#e74c3c';
+
+                // Hide all step forms
+                document.querySelectorAll('.step-form').forEach(f => f.classList.remove('active'));
+
+                // Show role selection
+                document.getElementById('role-selection').style.display = 'flex';
+                document.getElementById('progress-bar').style.display = 'none';
+                document.getElementById('new-submission-confirmation').style.display = 'none';
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                console.log('✅ Logged out - session cleared');
+            }
+        };
+
+        // Check for existing session when page loads
+        window.addEventListener('DOMContentLoaded', async function () {
+            const hasExistingSession = await checkExistingSession();
+            if (hasExistingSession) {
+                console.log('🔐 Auto-logged in from saved session');
+            }
+        });
     </script>
 </body>
 

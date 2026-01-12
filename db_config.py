@@ -120,6 +120,31 @@ def init_db():
             preferred_language TEXT DEFAULT 'en'
         )''')
         
+        # Citizens table - for registered/verified citizens
+        cursor.execute('''CREATE TABLE IF NOT EXISTS citizens (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            phone TEXT UNIQUE NOT NULL,
+            public_id TEXT,
+            verified_at TEXT,
+            last_login TEXT,
+            session_token TEXT,
+            preferred_language TEXT DEFAULT 'en',
+            created_at TEXT
+        )''' if is_postgres() else '''CREATE TABLE IF NOT EXISTS citizens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            phone TEXT UNIQUE NOT NULL,
+            public_id TEXT,
+            verified_at TEXT,
+            last_login TEXT,
+            session_token TEXT,
+            preferred_language TEXT DEFAULT 'en',
+            created_at TEXT
+        )''')
+        
         conn.commit()
         print(f"✅ Database initialized ({'PostgreSQL' if is_postgres() else 'SQLite'})")
         
